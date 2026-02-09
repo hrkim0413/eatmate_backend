@@ -1,10 +1,10 @@
 const mysql = require('mysql'); // 또는 mysql2
 
 const connection = mysql.createConnection({
-  host: 'localhost',
+  host: 'dadtabase',
   user: 'root',
   password: '1234',
-  database: 'eatmate'
+  database: 'kdt'
 });
 
 connection.connect((err) => {

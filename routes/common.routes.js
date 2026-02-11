@@ -1,6 +1,20 @@
 const router = require('express').Router();
 const connection = require('../config/db');
 
+/*** 헤더(header) ***/
+router.get('/user/:token_no', (req, res) => {
+  const token_no = req.params.token_no;
+
+  connection.query(
+    'SELECT * FROM users WHERE u_no = ?',
+    [token_no],
+    (err, result) => {
+      if (err) return res.status(500).json({ message: 'DB 조회 오류' });
+      res.json(result[0]);
+    }
+  )
+})
+
 /*** 댓글 영역 ***/
 // 댓글 출력
 router.post('/common/chat', (req, res) => {
@@ -20,6 +34,62 @@ router.post('/common/chat', (req, res) => {
       }
 
       res.json(reslut);
+    }
+  )
+})
+
+//댓글 삭제
+router.delete('/chat/comment/:ct_no', (req, res) => {
+  const ct_no = req.params.ct_no;
+  const { board_cate, board_no } = req.body;
+
+  // 카테고리별 매핑
+  const boardMap = {
+    review: {
+      table: 'board_review',
+      commentCol: 'br_comment',
+      noCol: 'br_no'
+    },
+    meetup: {
+      table: 'board_meetup',
+      commentCol: 'bm_comment',
+      noCol: 'bm_no'
+    },
+    community: {
+      table: 'board_community',
+      commentCol: 'bc_comment',
+      noCol: 'bc_no'
+    }
+  };
+  const boardInfo = boardMap[board_cate];
+  if (!boardInfo) return res.status(400).json({ error: '잘못된 board_cate' });
+  if (!board_no) return res.status(400).json({ error: 'board_no 누락' });
+  const { table, commentCol, noCol } = boardInfo;
+
+  // 댓글 삭제 쿼리문
+  connection.query(
+    'DELETE FROM comment WHERE ct_no = ?',
+    [ct_no],
+    (err, result) => {
+      if (err) {
+        console.log(err);
+        return res.status(500).json({ error: '삭제 실패' });
+      }
+
+      // 삭제된 게 없으면(이미 삭제됨 등) 댓글수도 그대로
+      if (result.affectedRows === 0) return res.status(404).json({ error: '댓글 없음' });
+
+      // 게시글 댓글 수 업데이트 쿼리문
+      connection.query(
+        `UPDATE ${table} 
+        SET ${commentCol} = GREATEST(${commentCol} - 1, 0)
+        WHERE ${noCol} = ?`,
+        [board_no],
+        (err2) => {
+          if (err2) return res.status(500).json({ error: '게시글 댓글 수 업데이트 실패' });
+          return res.json({ ok: true });
+        }
+      )
     }
   )
 })
@@ -46,8 +116,8 @@ router.post('/comment', (req, res) => {
       commentCol: 'bc_comment'
     }
   };
-
   const boardInfo = boardMap[ct_board_cate];
+
   if (!boardInfo) {
     return res.status(400).json({ error: '잘못된 게시판 카테고리' });
   }
@@ -100,7 +170,6 @@ router.post('/comment', (req, res) => {
     );
   });
 });
-
 
 /*** 하트 출력 ***/
 // board_review/board_meetup/board_community 테이블의 하트 수 업데이트

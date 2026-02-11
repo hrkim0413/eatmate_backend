@@ -76,7 +76,8 @@ router.get('/review', (req, res) => {
 });
 
 
-/*** [맛집 리뷰 - 상세] 조회 review/detail ***/
+/*** [맛집 리뷰 - 상세] review/detail ***/
+// 조회
 router.post('/review/detail/:br_no', (req, res) => {
   const { br_no } = req.params;
 
@@ -94,6 +95,20 @@ router.post('/review/detail/:br_no', (req, res) => {
       res.json(result[0]);
     }
   );
+})
+
+// 삭제
+router.delete('/review/detail/:br_no', (req, res) => {
+  const { br_no } = req.params;
+
+  connection.query(
+    'DELETE From board_review WHERE br_no = ?',
+    [br_no],
+    (err, result) => {
+      if (err) return res.status(500).json({ message: 'DB 삭제 오류' });
+      res.json({ message: '삭제 완료' });
+    }
+  )
 })
 
 /*** [맛집 - 목록] 조회 review/restaurant ***/
@@ -232,9 +247,76 @@ router.post('/write/review', upload.single('br_img'), (req, res) => {
         return res.status(500).json({ error: 'DB 입력 오류' });
       }
 
-      res.json({ success: '등록 성공' });
+      return res.json({ br_no: result.insertId });
     }
   )
+})
+
+// 본인이 쓴 게시글인 경우 수정이 가능
+// 1. 조회
+router.get('/write/review/modify/:br_no', (req, res) => {
+  const br_no = req.params.br_no;
+
+  connection.query(
+    `SELECT board_review.*, restaurant.*
+    FROM board_review 
+    INNER JOIN restaurant
+      ON board_review.br_rt_no = restaurant.rt_no
+    WHERE br_no = ?`,
+    [br_no],
+    (err, result) => {
+      if (err) return res.status(500).json({ message: 'DB 조회 오류' });
+
+      res.json(result[0]);
+    }
+  )
+})
+
+// 2. 수정
+router.put('/write/review/modify/:br_no', upload.single('br_img'), (req, res) => {
+  const br_no = req.params.br_no;
+  const { br_rank, br_desc, br_rt_no } = req.body
+  const br_img = req.file ? req.file.filename : null;
+
+  // 이미지 파일을 재선택 했을 떄 쿼리문
+  const sqlWithPic = `
+    UPDATE board_review 
+    SET br_img = ?, br_rt_no = ?, br_desc = ?, br_rank = ?
+    WHERE br_no = ?
+  `;
+
+  // 이미지 파일을 재선택 안했을 때 쿼리문
+  const sqlWithoutPic = `
+    UPDATE board_review 
+    SET br_rt_no = ?, br_desc = ?, br_rank = ? 
+    WHERE br_no = ?
+  `;
+
+  if (req.file) {
+    connection.query(
+      sqlWithPic,
+      [br_img, br_rt_no, br_desc, br_rank, br_no],
+      (err, result) => {
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ error: 'DB 맛집 리뷰 수정 실패' });
+        }
+        res.json({ success: '수정 완료' });
+      }
+    )
+  } else {
+    connection.query(
+      sqlWithoutPic,
+      [br_rt_no, br_desc, br_rank, br_no],
+      (err, result) => {
+        if (err) {
+          console.log(err);
+          return res.status(500).json({ error: 'DB 맛집 리뷰 수정 실패' });
+        }
+        res.json({ success: '수정 완료' });
+      }
+    )
+  }
 })
 
 module.exports = router;

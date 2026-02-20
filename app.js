@@ -17,6 +17,11 @@ app.use(cors());
 app.use(express.json()); // JSON 본문 파싱
 app.use(express.urlencoded({ extended: true }));
 
+// 헬스체크 엔드포인트 (CloudType 헬스체크용)
+app.get('/health', (req, res) => {
+  res.status(200).send('ok');
+});
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // 업로드된 이미지 확인 가능
 app.use('/', indexRouter);                      // 테스트 라우트
 app.use('/', commonRouter);                     // 공통
@@ -34,7 +39,5 @@ app.use((err, req, res, next) => {
   }
   return res.status(400).json({ error: err.message || '서버 오류' });
 });
-
-
 
 module.exports = app;
